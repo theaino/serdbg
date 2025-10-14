@@ -6,70 +6,144 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"go.bug.st/serial"
 )
 
-type model struct {
-	hpglContext *HPGLContext
-	width, height int
-	numBuffer string
-	instructions []string
-	instructionPointer int
+type ModelState any
+
+type StateNormal struct {}
+type StateSerialInput struct {
+	Option SerialOption
 }
 
-func newModel(file *os.File) (model model, err error) {
-	model.hpglContext = NewHPGLContext()
+type Model struct {
+	State ModelState
+	Width, Height int
+	NumBuffer string
+	ErrorBuffer string
 
+	HpglContext *HPGLContext
+	Instructions []string
+	InstructionPointer int
+
+	TextInput textinput.Model
+	InputValue string
+
+	PortName string
+	SerialPort serial.Port
+	SerialMode *serial.Mode
+}
+
+func NewModel(file *os.File) (model Model, err error) {
 	source, err := io.ReadAll(file)
 	if err != nil {
 		return
 	}
-	model.instructions = ParseHPGL(string(source))
-	model.instructionPointer = 0
+
+	model = Model{
+		State: StateNormal{},
+
+		HpglContext: NewHPGLContext(),
+		Instructions: ParseHPGL(string(source)),
+		InstructionPointer: 0,
+
+		TextInput: textinput.New(),
+
+		SerialMode: &serial.Mode{
+			BaudRate: 9600,
+			DataBits: 7,
+			Parity: serial.OddParity,
+			StopBits: serial.OneStopBit,
+		},
+	}
 	
 	return
 }
 
-func (m model) Init() tea.Cmd {
+func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmds := make([]tea.Cmd, 0)
+
+	switch m.State.(type) {
+	case StateSerialInput:
+		var cmd tea.Cmd
+		m.TextInput, cmd = m.TextInput.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		m.Width = msg.Width
+		m.Height = msg.Height
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
+		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
-		case "s":
-			amount := 1
-			if m.numBuffer != "" {
-				var err error
-				amount, err = strconv.Atoi(m.numBuffer)
-				if err != nil {
-					panic(err)
-				}
-				m.numBuffer = ""
-			}
-			m = m.step(amount)
-		default:
-			if strings.Contains("0123456789", msg.String()) {
-				m.numBuffer += msg.String()
-			} else {
-				m.numBuffer = ""
+		}
+		switch s := m.State.(type) {
+		case StateNormal:
+			var cmd tea.Cmd
+			m, cmd = m.HandleKey(msg.String())
+			cmds = append(cmds, cmd)
+		case StateSerialInput:
+			switch msg.String() {
+			case "enter":
+				m = m.SetSerialOption(s.Option, m.TextInput.Value())
+				fallthrough
+			case "esc":
+				m.State = StateNormal{}
 			}
 		}
 	}
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
-func (m model) step(n int) model {
+func (m Model) HandleKey(key string) (Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch key {
+	case "s":
+		amount := 1
+		if m.NumBuffer != "" {
+			var err error
+			amount, err = strconv.Atoi(m.NumBuffer)
+			if err != nil {
+				panic(err)
+			}
+			m.NumBuffer = ""
+		}
+		m = m.step(amount)
+	case "o":
+		m = m.OpenPort()
+	default:
+		option, ok := SerialOptionKeyMap()[key]
+		if ok {
+			m.State = StateSerialInput{
+				Option: option,
+			}
+			cmd = m.TextInput.Focus()
+			m.TextInput.Reset()
+			m.TextInput.Placeholder = SerialOptionDefinitions[option].Placeholder
+			break
+		}
+		if strings.Contains("0123456789", key) {
+			m.NumBuffer += key
+		} else {
+			m.NumBuffer = ""
+		}
+	}
+	return m, cmd
+}
+
+func (m Model) step(n int) Model {
 	for range n {
-		instruction := m.instructions[m.instructionPointer]
-		m.hpglContext.RunInstruction(instruction)
-		m.instructionPointer++
+		instruction := m.Instructions[m.InstructionPointer]
+		m.HpglContext.RunInstruction(instruction)
+		m.InstructionPointer++
 	}
 	return m
 }
+
