@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package proto;
+option go_package = "serdbg/proto";
+
+import "google/protobuf/empty.proto";
+
+service Serial {
+  rpc SendString (SendStringRequest) returns (google.protobuf.Empty);
+}
+
+message SendStringRequest {
+  string name = 1;
+}
