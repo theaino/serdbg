@@ -6,12 +6,12 @@ import (
 )
 
 func WrapString(text string, width int) (string, int) {
-	lineCount := int(math.Ceil(float64(len(text) / width)))
+	lineCount := int(math.Ceil(float64(len(text)) / float64(width)))
 	lines := make([]string, lineCount)
 	for idx := range lineCount {
 		start := idx * width
 		end := start + width
-		lines[idx] = text[start:end]
+		lines[idx] = text[start:min(end, len(text))]
 	}
 	return strings.Join(lines, "\n"), lineCount
 }

@@ -50,7 +50,7 @@ func (m Model) View() string {
 
 	m.TextInput.Width = m.Width
 	var footerValue string
-	footerViewHeight := 0
+	footerViewHeight := 1
 	switch m.State.(type) {
 	case StateNormal:
 		footerEntries := []string{
@@ -96,7 +96,7 @@ func (m Model) View() string {
 func (m Model) getInstructionSlice(height int) ([]string, int) {
 	padding := max(float64(height - 1) / 2, 0)
 	startIdx := max(0, m.InstructionPointer - int(math.Ceil(padding)))
-	endIdx := min(len(m.Instructions), startIdx + 2 * int(padding) + 1)
+	endIdx := startIdx + height - 1
 
 	return m.Instructions[startIdx:endIdx], startIdx
 }

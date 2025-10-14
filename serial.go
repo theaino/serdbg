@@ -134,7 +134,10 @@ func (m Model) SetSerialOption(option SerialOption, value string) Model {
 			m.ErrorBuffer = fmt.Sprintf("Invalid stop bits: %s", value)
 		}
 	}
-	return m.OpenPort()
+	if m.PortName != "" {
+		m = m.OpenPort()
+	}
+	return m
 }
 
 func (m Model) GetSerialOption(option SerialOption) string {
