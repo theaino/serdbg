@@ -6,9 +6,33 @@ option go_package = "serdbg/proto";
 import "google/protobuf/empty.proto";
 
 service Serial {
-  rpc SendString (SendStringRequest) returns (google.protobuf.Empty);
+  rpc GetMode (google.protobuf.Empty) returns (Mode);
+  rpc SetMode (Mode) returns (google.protobuf.Empty);
+
+  rpc GetPort (google.protobuf.Empty) returns (Port);
+  rpc SetPort (Port) returns (Error);
+
+  rpc SendString (SendStringRequest) returns (Error);
+}
+
+message Mode {
+  int64 baudRate = 1;
+  int64 dataBits = 2;
+  int64 parity = 3;
+  int64 stopBits = 4;
+  bool rts = 5;
+  bool dtr = 6;
+}
+
+message Port {
+  string port = 1;
 }
 
 message SendStringRequest {
-  string name = 1;
+  string data = 1;
+}
+
+message Error {
+  bool failed = 1;
+  string value = 2;
 }

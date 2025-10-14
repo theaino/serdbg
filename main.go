@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"serdbg/server"
 
@@ -10,6 +11,7 @@ import (
 
 func main() {
 	server := flag.Bool("server", false, "Run as serial server")
+	flag.Parse()
 	
 	if *server {
 		runServer()
@@ -23,7 +25,31 @@ func runServer() {
 }
 
 func runClient() {
-	file, err := os.Open(os.Args[1])
+	serial, err := NewSerialConnection()
+	if err != nil {
+		panic(err)
+	}
+	err = serial.SendString("Hello")
+	if err != nil {
+		panic(err)
+	}
+	port, err := serial.GetPort()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Port: %s\n", port)
+	err = serial.SetPort("/dev/ttyUSB0")
+	if err != nil {
+		panic(err)
+	}
+	port, err = serial.GetPort()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Port: %s\n", port)
+	serial.Close()
+
+	file, err := os.Open(flag.Arg(0))
 	if err != nil {
 		panic(err)
 	}

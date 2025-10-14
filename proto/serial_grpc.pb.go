@@ -20,6 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	Serial_GetMode_FullMethodName    = "/proto.Serial/GetMode"
+	Serial_SetMode_FullMethodName    = "/proto.Serial/SetMode"
+	Serial_GetPort_FullMethodName    = "/proto.Serial/GetPort"
+	Serial_SetPort_FullMethodName    = "/proto.Serial/SetPort"
 	Serial_SendString_FullMethodName = "/proto.Serial/SendString"
 )
 
@@ -27,7 +31,11 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SerialClient interface {
-	SendString(ctx context.Context, in *SendStringRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetMode(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Mode, error)
+	SetMode(ctx context.Context, in *Mode, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetPort(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Port, error)
+	SetPort(ctx context.Context, in *Port, opts ...grpc.CallOption) (*Error, error)
+	SendString(ctx context.Context, in *SendStringRequest, opts ...grpc.CallOption) (*Error, error)
 }
 
 type serialClient struct {
@@ -38,9 +46,49 @@ func NewSerialClient(cc grpc.ClientConnInterface) SerialClient {
 	return &serialClient{cc}
 }
 
-func (c *serialClient) SendString(ctx context.Context, in *SendStringRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *serialClient) GetMode(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Mode, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Mode)
+	err := c.cc.Invoke(ctx, Serial_GetMode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serialClient) SetMode(ctx context.Context, in *Mode, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Serial_SetMode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serialClient) GetPort(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*Port, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Port)
+	err := c.cc.Invoke(ctx, Serial_GetPort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serialClient) SetPort(ctx context.Context, in *Port, opts ...grpc.CallOption) (*Error, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Error)
+	err := c.cc.Invoke(ctx, Serial_SetPort_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *serialClient) SendString(ctx context.Context, in *SendStringRequest, opts ...grpc.CallOption) (*Error, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Error)
 	err := c.cc.Invoke(ctx, Serial_SendString_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -52,7 +100,11 @@ func (c *serialClient) SendString(ctx context.Context, in *SendStringRequest, op
 // All implementations must embed UnimplementedSerialServer
 // for forward compatibility.
 type SerialServer interface {
-	SendString(context.Context, *SendStringRequest) (*emptypb.Empty, error)
+	GetMode(context.Context, *emptypb.Empty) (*Mode, error)
+	SetMode(context.Context, *Mode) (*emptypb.Empty, error)
+	GetPort(context.Context, *emptypb.Empty) (*Port, error)
+	SetPort(context.Context, *Port) (*Error, error)
+	SendString(context.Context, *SendStringRequest) (*Error, error)
 	mustEmbedUnimplementedSerialServer()
 }
 
@@ -63,7 +115,19 @@ type SerialServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSerialServer struct{}
 
-func (UnimplementedSerialServer) SendString(context.Context, *SendStringRequest) (*emptypb.Empty, error) {
+func (UnimplementedSerialServer) GetMode(context.Context, *emptypb.Empty) (*Mode, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMode not implemented")
+}
+func (UnimplementedSerialServer) SetMode(context.Context, *Mode) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetMode not implemented")
+}
+func (UnimplementedSerialServer) GetPort(context.Context, *emptypb.Empty) (*Port, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPort not implemented")
+}
+func (UnimplementedSerialServer) SetPort(context.Context, *Port) (*Error, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetPort not implemented")
+}
+func (UnimplementedSerialServer) SendString(context.Context, *SendStringRequest) (*Error, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendString not implemented")
 }
 func (UnimplementedSerialServer) mustEmbedUnimplementedSerialServer() {}
@@ -85,6 +149,78 @@ func RegisterSerialServer(s grpc.ServiceRegistrar, srv SerialServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Serial_ServiceDesc, srv)
+}
+
+func _Serial_GetMode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerialServer).GetMode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Serial_GetMode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerialServer).GetMode(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Serial_SetMode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Mode)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerialServer).SetMode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Serial_SetMode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerialServer).SetMode(ctx, req.(*Mode))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Serial_GetPort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerialServer).GetPort(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Serial_GetPort_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerialServer).GetPort(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Serial_SetPort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Port)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SerialServer).SetPort(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Serial_SetPort_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SerialServer).SetPort(ctx, req.(*Port))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Serial_SendString_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -112,6 +248,22 @@ var Serial_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "proto.Serial",
 	HandlerType: (*SerialServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetMode",
+			Handler:    _Serial_GetMode_Handler,
+		},
+		{
+			MethodName: "SetMode",
+			Handler:    _Serial_SetMode_Handler,
+		},
+		{
+			MethodName: "GetPort",
+			Handler:    _Serial_GetPort_Handler,
+		},
+		{
+			MethodName: "SetPort",
+			Handler:    _Serial_SetPort_Handler,
+		},
 		{
 			MethodName: "SendString",
 			Handler:    _Serial_SendString_Handler,
