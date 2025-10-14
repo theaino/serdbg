@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -34,9 +35,11 @@ var StopBitsMap = map[string]serial.StopBits{
 }
 
 func joinKeysReadable[T any](stringMap map[string]T) string {
+	keys := slices.Collect(maps.Keys(stringMap))
+	sort.Strings(keys)
 	return strings.Join(append(
-		slices.Collect(maps.Keys(ParityMap))[:len(ParityMap)-1],
-		fmt.Sprintf("or %s", slices.Collect(maps.Keys(ParityMap))[len(ParityMap)-1]),
+		keys[:len(stringMap)-1],
+		fmt.Sprintf("or %s", keys[len(stringMap)-1]),
 	), ", ")
 }
 

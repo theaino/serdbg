@@ -15,12 +15,11 @@ var sentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 var currentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
 var futureStyle = lipgloss.NewStyle().Italic(true)
 
-func (m Model) View() string {
-	if m.Width == 0 {
+func (m Model) View() string { if m.Width == 0 {
 		return ""
 	}
 
-	wrappedErrorText, errorViewHeight := WrapString(m.ErrorBuffer, m.Width)
+	wrappedErrorText, errorViewHeight := WrapString(fmt.Sprintf(" %v", m.ErrorBuffer), m.Width)
 	errorView := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).
 		Bold(true).
 		Height(errorViewHeight).
