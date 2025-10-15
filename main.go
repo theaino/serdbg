@@ -23,6 +23,7 @@ func runClient() {
 		panic(err)
 	}
 	program := tea.NewProgram(model)
+	go model.StepListener(program)
 	if _, err := program.Run(); err != nil {
 		panic(err)
 	}

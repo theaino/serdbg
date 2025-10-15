@@ -64,6 +64,8 @@ func (m *Model) View() string { if m.Width == 0 {
 		footerEntries := []string{
 			"s - Step",
 			"[0-9]+s - Step n times",
+			"e - Send whole buffer",
+			"x - Stop sending",
 		}
 		for _, option := range SerialOptions {
 			definition := SerialOptionDefinitions[option]
@@ -91,14 +93,18 @@ func (m *Model) View() string { if m.Width == 0 {
 	instructions, startIdx := m.getInstructionSlice(instructionViewHeight)
 	text := make([]string, len(instructions))
 	for idx, instruction := range instructions {
-		realIdx := idx + startIdx
+		realIdx := int64(idx) + startIdx
 		instructionStyle := sentStyle
-		if realIdx == m.InstructionPointer {
+		if realIdx == m.InstructionPointer.Load() {
 			instructionStyle = currentStyle
-		} else if realIdx > m.InstructionPointer {
+		} else if realIdx > m.InstructionPointer.Load() {
 			instructionStyle = futureStyle
 		}
-		line := fmt.Sprintf("%s%s", lineNumStyle.Render(strconv.Itoa(realIdx)), instructionStyle.Render(instruction))
+		lineNumStyle := lineNumStyle
+		if realIdx == m.InstructionPointerTarget {
+			lineNumStyle = lineNumStyle.Foreground(lipgloss.Color("1"))
+		}
+		line := fmt.Sprintf("%s%s", lineNumStyle.Render(strconv.FormatInt(realIdx, 10)), instructionStyle.Render(instruction))
 		text[idx] = line
 	}
 	instructionView := strings.Join(text, "\n")
@@ -106,10 +112,10 @@ func (m *Model) View() string { if m.Width == 0 {
 	return lipgloss.JoinVertical(lipgloss.Left, instructionView, errorView, dbgView, serialView, footerView)
 }
 
-func (m *Model) getInstructionSlice(height int) ([]string, int) {
+func (m *Model) getInstructionSlice(height int) ([]string, int64) {
 	padding := max(float64(height - 1) / 2, 0)
-	startIdx := max(0, m.InstructionPointer - int(math.Ceil(padding)))
-	endIdx := startIdx + height
+	startIdx := max(0, m.InstructionPointer.Load() - int64(math.Ceil(padding)))
+	endIdx := startIdx + int64(height)
 
 	stringInstructions := make([]string, endIdx - startIdx)
 	for idx, instruction := range m.Instructions[startIdx:endIdx] {

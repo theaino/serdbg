@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -32,11 +34,14 @@ type Model struct {
 
 	HpglState *HPGLState
 	Instructions []HPGLInstruction
-	InstructionPointer int
+	InstructionPointer atomic.Int64
+	InstructionPointerTarget int64
 
 	TextInput textinput.Model
 	InputValue string
 
+	KillStepListener chan bool
+	SerialMutex sync.Mutex
 	PortName string
 	SerialPort serial.Port
 	SerialMode *serial.Mode
@@ -53,10 +58,10 @@ func NewModel(file *os.File) (model *Model, err error) {
 
 		HpglState: NewHPGLState(),
 		Instructions: NewHPGLParsingState().ParseInstructions(string(source)),
-		InstructionPointer: 0,
 
 		TextInput: textinput.New(),
 
+		KillStepListener:make(chan bool),
 		SerialMode: &serial.Mode{
 			BaudRate: 9600,
 			DataBits: 7,
@@ -88,6 +93,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Height = msg.Height
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
+			m.KillStepListener <- true
 			return m, tea.Quit
 		}
 		switch s := m.State.(type) {
@@ -112,16 +118,20 @@ func (m *Model) HandleKey(key string) tea.Cmd {
 	var cmd tea.Cmd
 	switch key {
 	case "s":
-		amount := 1
+		amount := int64(1)
 		if m.NumBuffer != "" {
 			var err error
-			amount, err = strconv.Atoi(m.NumBuffer)
+			amount, err = strconv.ParseInt(m.NumBuffer, 10, 64)
 			if err != nil {
 				panic(err)
 			}
 			m.NumBuffer = ""
 		}
-		m.step(amount)
+		m.InstructionPointerTarget += amount
+	case "e":
+		m.InstructionPointerTarget = int64(len(m.Instructions)) - 1
+	case "x":
+		m.InstructionPointerTarget = m.InstructionPointer.Load()
 	case "o":
 		m.OpenPort()
 	default:
@@ -144,19 +154,32 @@ func (m *Model) HandleKey(key string) tea.Cmd {
 	return cmd
 }
 
-func (m *Model) step(n int) {
-	for range n {
-		instruction := m.Instructions[m.InstructionPointer]
+func (m *Model) StepListener(program *tea.Program) {
+	for {
+		select {
+		case <-m.KillStepListener:
+			return
+		default:
+		}
+		if m.InstructionPointer.Load() >= m.InstructionPointerTarget {
+			continue
+		}
+		m.SerialMutex.Lock()
+		instruction := m.Instructions[m.InstructionPointer.Load()]
 		m.HpglState.RunInstruction(instruction)
-			if m.SerialPort != nil {
+		if m.SerialPort != nil {
 			n, err := m.SerialPort.Write([]byte(instruction.Source))
 			if err != nil {
+				m.Error(err)
+			} else if err := m.SerialPort.Drain(); err != nil {
 				m.Error(err)
 			} else {
 				m.SerialWrittenBuffer = strconv.Itoa(n)
 			}
 		}
-		m.InstructionPointer++
+		m.InstructionPointer.Add(1)
+		m.SerialMutex.Unlock()
+		program.Send(struct{}{})
 	}
 }
 
