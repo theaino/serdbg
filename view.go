@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 )
 
-var lineNumStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Width(4)
+var lineNumStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 var sentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 var currentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
 var futureStyle = lipgloss.NewStyle().Italic(true)
@@ -100,7 +100,7 @@ func (m *Model) View() string { if m.Width == 0 {
 		} else if realIdx > m.InstructionPointer.Load() {
 			instructionStyle = futureStyle
 		}
-		lineNumStyle := lineNumStyle
+		lineNumStyle := lineNumStyle.Width(len(strconv.Itoa(len(m.Instructions)-1))+1)
 		if realIdx == m.InstructionPointerTarget {
 			lineNumStyle = lineNumStyle.Foreground(lipgloss.Color("1"))
 		}
