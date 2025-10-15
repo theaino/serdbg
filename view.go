@@ -15,11 +15,11 @@ var sentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 var currentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
 var futureStyle = lipgloss.NewStyle().Italic(true)
 
-func (m Model) View() string { if m.Width == 0 {
+func (m *Model) View() string { if m.Width == 0 {
 		return ""
 	}
 
-	wrappedErrorText, errorViewHeight := WrapString(fmt.Sprintf(" %v", m.ErrorBuffer), m.Width)
+	wrappedErrorText, errorViewHeight := WrapString(fmt.Sprintf(" %v", m.ErrorBuffer.Value), m.Width)
 	errorView := lipgloss.NewStyle().Foreground(lipgloss.Color("1")).
 		Bold(true).
 		Height(errorViewHeight).
@@ -92,10 +92,10 @@ func (m Model) View() string { if m.Width == 0 {
 	return lipgloss.JoinVertical(lipgloss.Left, instructionView, errorView, dbgView, serialView, footerView)
 }
 
-func (m Model) getInstructionSlice(height int) ([]string, int) {
+func (m *Model) getInstructionSlice(height int) ([]string, int) {
 	padding := max(float64(height - 1) / 2, 0)
 	startIdx := max(0, m.InstructionPointer - int(math.Ceil(padding)))
-	endIdx := startIdx + height - 1
+	endIdx := startIdx + height
 
 	return m.Instructions[startIdx:endIdx], startIdx
 }

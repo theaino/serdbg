@@ -85,16 +85,15 @@ func SerialOptionKeyMap() map[string]SerialOption {
 	return keyMap
 }
 
-func (m Model) OpenPort() Model {
+func (m *Model) OpenPort() {
 	var err error
 	m.SerialPort, err = serial.Open(m.PortName, m.SerialMode)
 	if err != nil {
-		m.ErrorBuffer = err.Error()
+		m.Error(err)
 	}
-	return m
 }
 
-func (m Model) SetSerialOption(option SerialOption, value string) Model {
+func (m *Model) SetSerialOption(option SerialOption, value string) {
 	switch option {
 	case OptionPort:
 		m.PortName = value
@@ -103,14 +102,16 @@ func (m Model) SetSerialOption(option SerialOption, value string) Model {
 		if err == nil {
 			m.SerialMode.BaudRate = baudrate
 		} else {
-			m.ErrorBuffer = err.Error()
+			m.Error(err)
+			return
 		}
 	case OptionDataBits:
 		dataBits, err := strconv.Atoi(value)
 		if err == nil {
 			m.SerialMode.DataBits = dataBits
 		} else {
-			m.ErrorBuffer = err.Error()
+			m.Error(err)
+			return
 		}
 	case OptionParity:
 		parity, ok := map[string]serial.Parity{
@@ -123,7 +124,8 @@ func (m Model) SetSerialOption(option SerialOption, value string) Model {
 		if ok {
 			m.SerialMode.Parity = parity
 		} else {
-			m.ErrorBuffer = fmt.Sprintf("Invalid parity: %s", value)
+			m.Error(fmt.Sprintf("Invalid parity: %s", value))
+			return
 		}
 	case OptionStopBits:
 		stopBits, ok := map[string]serial.StopBits{
@@ -134,16 +136,16 @@ func (m Model) SetSerialOption(option SerialOption, value string) Model {
 		if ok {
 			m.SerialMode.StopBits = stopBits
 		} else {
-			m.ErrorBuffer = fmt.Sprintf("Invalid stop bits: %s", value)
+			m.Error(fmt.Sprintf("Invalid stop bits: %s", value))
+			return
 		}
 	}
 	if m.PortName != "" {
-		m = m.OpenPort()
+		m.OpenPort()
 	}
-	return m
 }
 
-func (m Model) GetSerialOption(option SerialOption) string {
+func (m *Model) GetSerialOption(option SerialOption) string {
 	switch option {
 	case OptionPort:
 		return m.PortName

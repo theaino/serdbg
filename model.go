@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -22,7 +24,10 @@ type Model struct {
 	State ModelState
 	Width, Height int
 	NumBuffer string
-	ErrorBuffer string
+	ErrorBuffer struct {
+		Value string
+		Time time.Time
+	}
 
 	HpglContext *HPGLContext
 	Instructions []string
@@ -36,13 +41,13 @@ type Model struct {
 	SerialMode *serial.Mode
 }
 
-func NewModel(file *os.File) (model Model, err error) {
+func NewModel(file *os.File) (model *Model, err error) {
 	source, err := io.ReadAll(file)
 	if err != nil {
 		return
 	}
 
-	model = Model{
+	model = &Model{
 		State: StateNormal{},
 
 		HpglContext: NewHPGLContext(),
@@ -62,11 +67,11 @@ func NewModel(file *os.File) (model Model, err error) {
 	return
 }
 
-func (m Model) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := make([]tea.Cmd, 0)
 
 	switch m.State.(type) {
@@ -87,12 +92,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch s := m.State.(type) {
 		case StateNormal:
 			var cmd tea.Cmd
-			m, cmd = m.HandleKey(msg.String())
+			cmd = m.HandleKey(msg.String())
 			cmds = append(cmds, cmd)
 		case StateSerialInput:
 			switch msg.String() {
 			case "enter":
-				m = m.SetSerialOption(s.Option, m.TextInput.Value())
+				m.SetSerialOption(s.Option, m.TextInput.Value())
 				fallthrough
 			case "esc":
 				m.State = StateNormal{}
@@ -102,7 +107,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) HandleKey(key string) (Model, tea.Cmd) {
+func (m *Model) HandleKey(key string) tea.Cmd {
 	var cmd tea.Cmd
 	switch key {
 	case "s":
@@ -115,9 +120,9 @@ func (m Model) HandleKey(key string) (Model, tea.Cmd) {
 			}
 			m.NumBuffer = ""
 		}
-		m = m.step(amount)
+		m.step(amount)
 	case "o":
-		m = m.OpenPort()
+		m.OpenPort()
 	default:
 		option, ok := SerialOptionKeyMap()[key]
 		if ok {
@@ -135,15 +140,18 @@ func (m Model) HandleKey(key string) (Model, tea.Cmd) {
 			m.NumBuffer = ""
 		}
 	}
-	return m, cmd
+	return cmd
 }
 
-func (m Model) step(n int) Model {
+func (m *Model) step(n int) {
 	for range n {
 		instruction := m.Instructions[m.InstructionPointer]
 		m.HpglContext.RunInstruction(instruction)
 		m.InstructionPointer++
 	}
-	return m
 }
 
+func (m *Model) Error(value any) {
+	m.ErrorBuffer.Value = fmt.Sprintf("%v", value)
+	m.ErrorBuffer.Time = time.Now()
+}
