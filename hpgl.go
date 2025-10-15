@@ -1,68 +1,167 @@
 package main
 
 import (
+	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
 
-type HPGLContext struct {
+var ETXCmds = []string{"LB", "BL"}
+
+type HPGLInstruction struct {
+	Command string
+	Argument string
+	Source string
+}
+
+func NewHPGLInstruction(command, argument, source string) HPGLInstruction {
+	return HPGLInstruction{
+		strings.ToUpper(command),
+		argument,
+		source,
+	}
+}
+
+func (i HPGLInstruction) String() string {
+	if i.Argument == "" {
+		return fmt.Sprintf("%s;", i.Command)
+	}
+	if slices.Contains(ETXCmds, i.Command) {
+		return fmt.Sprintf("%s %#v;", i.Command, i.Argument)
+	}
+	return fmt.Sprintf("%s %s;", i.Command, i.Argument)
+}
+
+type HPGLParsingState struct {
+	Terminator string
+}
+
+func NewHPGLParsingState() *HPGLParsingState {
+	return &HPGLParsingState{
+		Terminator: "\x03",
+	}
+}
+
+func (s *HPGLParsingState) ParseInstructions(source string) []HPGLInstruction {
+	instructions := make([]HPGLInstruction, 0)
+	inETX := false
+	currentCommand := ""
+	currentArgument := ""
+	currentSource := ""
+	for _, char := range []byte(source) {
+		if !strings.Contains("\n", string(char)) {
+			currentSource += string(char)
+		}
+		if inETX {
+			if string(char) == s.Terminator {
+				inETX = false
+			} else {
+				currentArgument += string(char)
+			}
+			continue
+		}
+		if strings.Contains(" \n", string(char)) {
+			continue
+		}
+		if len(currentCommand) < 2 {
+			currentCommand += string(char)
+			inETX = slices.Contains(ETXCmds, currentCommand)
+			continue
+		}
+		if char == ';' {
+			instruction := NewHPGLInstruction(currentCommand, currentArgument, currentSource)
+			s.HandleInstruction(instruction)
+			instructions = append(instructions, instruction)
+			currentCommand = ""
+			currentArgument = ""
+			currentSource = ""
+			continue
+		}
+		currentArgument += string(char)
+	}
+	if len(currentCommand) > 0 {
+		instruction := NewHPGLInstruction(currentCommand, currentArgument, currentSource)
+		s.HandleInstruction(instruction)
+		instructions = append(instructions, instruction)
+	}
+	return instructions
+}
+
+func (s *HPGLParsingState) HandleInstruction(instruction HPGLInstruction) {
+	if instruction.Command == "DT" {
+		s.Terminator = instruction.Argument
+	}
+}
+
+type HPGLInterpretingState struct {
 	X, Y int
 	PenDown bool
 }
 
-func ParseHPGL(source string) (instructions []string) {
-	instructions = strings.Split(strings.ReplaceAll(source, "\n", ""), ";")
-	instructions = instructions[:len(instructions)-1]
-	for idx, instruction := range instructions {
-		instructions[idx] = instruction + ";"
-	}
-	return
-}
-
-func NewHPGLContext() *HPGLContext {
-	return &HPGLContext{
+func NewHPGLInterpretingState() *HPGLInterpretingState {
+	return &HPGLInterpretingState{
 		X: 0,
 		Y: 0,
 		PenDown: false,
 	}
 }
 
-func (c *HPGLContext) RunInstruction(instruction string) error {
-	instruction = strings.TrimSuffix(instruction, ";")
-	parts := strings.Split(instruction, " ")
-	switch strings.ToUpper(parts[0]) {
+func (s *HPGLInterpretingState) InterpretInstruction(instruction HPGLInstruction) (err error) {
+	switch instruction.Command {
 	case "PA":
-		if len(parts) < 2 {
-			c.X = 0
-			c.Y = 0
+		if instruction.Argument == "" {
+			s.X = 0
+			s.Y = 0
 		} else {
-			coordinate := strings.Split(parts[1], ",")
-			var err error
-			c.X, err = strconv.Atoi(coordinate[0])
+			coordinate := strings.Split(instruction.Argument, ",")
+			s.X, err = strconv.Atoi(coordinate[0])
 			if err != nil {
-				return err
+				return
 			}
-			c.Y, err = strconv.Atoi(coordinate[1])
+			s.Y, err = strconv.Atoi(coordinate[1])
 			if err != nil {
-				return err
+				return
 			}
 		}
 	case "PR":
-		coordinate := strings.Split(parts[1], ",")
-		x, err := strconv.Atoi(coordinate[0])
-		if err != nil {
-			return err
+		if instruction.Argument == "" {
+		} else {
+			coordinate := strings.Split(instruction.Argument, ",")
+			var x, y int
+			x, err = strconv.Atoi(coordinate[0])
+			if err != nil {
+				return
+			}
+			y, err = strconv.Atoi(coordinate[1])
+			if err != nil {
+				return
+			}
+			s.X += x
+			s.Y += y
 		}
-		y, err := strconv.Atoi(coordinate[1])
-		if err != nil {
-			return err
-		}
-		c.X += x
-		c.Y += y
 	case "PU":
-		c.PenDown = false
+		s.PenDown = false
 	case "PD":
-		c.PenDown = true
+		s.PenDown = true
 	}
-	return nil
+	return
 }
+
+type HPGLState struct {
+	*HPGLParsingState
+	*HPGLInterpretingState
+}
+
+func NewHPGLState() *HPGLState {
+	return &HPGLState{
+		NewHPGLParsingState(),
+		NewHPGLInterpretingState(),
+	}
+}
+
+func (s *HPGLState) RunInstruction(instruction HPGLInstruction) error {
+	s.HandleInstruction(instruction)
+	return s.InterpretInstruction(instruction)
+}
+

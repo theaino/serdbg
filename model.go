@@ -24,13 +24,14 @@ type Model struct {
 	State ModelState
 	Width, Height int
 	NumBuffer string
+	SerialWrittenBuffer string
 	ErrorBuffer struct {
 		Value string
 		Time time.Time
 	}
 
-	HpglContext *HPGLContext
-	Instructions []string
+	HpglState *HPGLState
+	Instructions []HPGLInstruction
 	InstructionPointer int
 
 	TextInput textinput.Model
@@ -50,8 +51,8 @@ func NewModel(file *os.File) (model *Model, err error) {
 	model = &Model{
 		State: StateNormal{},
 
-		HpglContext: NewHPGLContext(),
-		Instructions: ParseHPGL(string(source)),
+		HpglState: NewHPGLState(),
+		Instructions: NewHPGLParsingState().ParseInstructions(string(source)),
 		InstructionPointer: 0,
 
 		TextInput: textinput.New(),
@@ -146,7 +147,15 @@ func (m *Model) HandleKey(key string) tea.Cmd {
 func (m *Model) step(n int) {
 	for range n {
 		instruction := m.Instructions[m.InstructionPointer]
-		m.HpglContext.RunInstruction(instruction)
+		m.HpglState.RunInstruction(instruction)
+			if m.SerialPort != nil {
+			n, err := m.SerialPort.Write([]byte(instruction.Source))
+			if err != nil {
+				m.Error(err)
+			} else {
+				m.SerialWrittenBuffer = strconv.Itoa(n)
+			}
+		}
 		m.InstructionPointer++
 	}
 }

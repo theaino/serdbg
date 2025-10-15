@@ -28,10 +28,11 @@ func (m *Model) View() string { if m.Width == 0 {
 	dbgViewHeight := 5
 	dbgTable := table.New().
 		Border(lipgloss.NormalBorder()).
-		Headers("x", "y", "pen").Rows([]string{
-			strconv.Itoa(m.HpglContext.X),
-			strconv.Itoa(m.HpglContext.Y),
-			map[bool]string{true: "down", false: "up"}[m.HpglContext.PenDown],
+		Headers("X", "Y", "PEN", "ETX").Rows([]string{
+			strconv.Itoa(m.HpglState.X),
+			strconv.Itoa(m.HpglState.Y),
+			map[bool]string{true: "down", false: "up"}[m.HpglState.PenDown],
+			fmt.Sprintf("%#v", m.HpglState.Terminator),
 		})
 	dbgView := lipgloss.NewStyle().Width(m.Width).Height(dbgViewHeight).Render(dbgTable.Render())
 
@@ -39,8 +40,16 @@ func (m *Model) View() string { if m.Width == 0 {
 	for idx, option := range SerialOptions {
 		serialViewEntries[idx] = fmt.Sprintf("%s: %s", SerialOptionDefinitions[option].Name, m.GetSerialOption(option))
 	}
+	if m.SerialWrittenBuffer != "" {
+		serialViewEntries = append(serialViewEntries,
+			lipgloss.NewStyle().Italic(true).Render(fmt.Sprintf("  %s b written", m.SerialWrittenBuffer)),
+		)
+	}
 	serialText, serialViewHeight := JoinStringWrapped(serialViewEntries, "  ", m.Width)
-	serialView := lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Height(serialViewHeight).Render(serialText)
+	serialView := lipgloss.NewStyle().Foreground(lipgloss.Color(map[bool]string{
+		true: "3",
+		false: "2",
+	}[m.SerialPort == nil])).Height(serialViewHeight).Render(serialText)
 
 	m.TextInput.PlaceholderStyle = m.TextInput.PlaceholderStyle.
 		Foreground(lipgloss.Color("8")).
@@ -60,7 +69,12 @@ func (m *Model) View() string { if m.Width == 0 {
 			definition := SerialOptionDefinitions[option]
 			footerEntries = append(footerEntries, fmt.Sprintf("%s - Set %s", definition.Key, definition.Name))
 		}
-		footerEntries = append(footerEntries, "o - Reopen port", "^C - Quit", "  " + m.NumBuffer)
+		footerEntries = append(footerEntries, "o - Reopen port", "^C - Quit")
+		if m.NumBuffer != "" {
+			footerEntries = append(footerEntries, fmt.Sprintf("  %s",
+				lipgloss.NewStyle().Italic(true).Render(m.NumBuffer),
+			))
+		}
 		footerValue, footerViewHeight = JoinStringWrapped(footerEntries, "    ", m.Width)
 	case StateSerialInput:
 		footerValue = m.TextInput.View()
@@ -97,5 +111,9 @@ func (m *Model) getInstructionSlice(height int) ([]string, int) {
 	startIdx := max(0, m.InstructionPointer - int(math.Ceil(padding)))
 	endIdx := startIdx + height
 
-	return m.Instructions[startIdx:endIdx], startIdx
+	stringInstructions := make([]string, endIdx - startIdx)
+	for idx, instruction := range m.Instructions[startIdx:endIdx] {
+		stringInstructions[idx] = instruction.String()
+	}
+	return stringInstructions, startIdx
 }
