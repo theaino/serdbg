@@ -86,6 +86,8 @@ func SerialOptionKeyMap() map[string]SerialOption {
 }
 
 func (m *Model) OpenPort() {
+	m.SerialMutex.Lock()
+	defer m.SerialMutex.Unlock()
 	var err error
 	m.SerialPort, err = serial.Open(m.PortName, m.SerialMode)
 	if err != nil {
