@@ -21,6 +21,7 @@ type StateNormal struct {}
 type StateSerialInput struct {
 	Option SerialOption
 }
+type StateFileInput struct {}
 
 type Model struct {
 	State ModelState
@@ -47,17 +48,12 @@ type Model struct {
 	SerialMode *serial.Mode
 }
 
-func NewModel(file *os.File) (model *Model, err error) {
-	source, err := io.ReadAll(file)
-	if err != nil {
-		return
-	}
-
+func NewModel() (model *Model, err error) {
 	model = &Model{
 		State: StateNormal{},
 
 		HpglState: NewHPGLState(),
-		Instructions: NewHPGLParsingState().ParseInstructions(string(source)),
+		Instructions: make([]HPGLInstruction, 0),
 
 		TextInput: textinput.New(),
 
@@ -73,6 +69,23 @@ func NewModel(file *os.File) (model *Model, err error) {
 	return
 }
 
+func (m *Model) LoadFile(path string) {
+	file, err := os.Open(path)
+	if err != nil {
+		m.Error(err)
+		return
+	}
+	source, err := io.ReadAll(file)
+	if err != nil {
+		m.Error(err)
+		return
+	}
+	m.Instructions = NewHPGLParsingState().ParseInstructions(string(source))
+	m.HpglState = NewHPGLState()
+	m.InstructionPointer.Store(0)
+	m.InstructionPointerTarget = 0
+}
+
 func (m *Model) Init() tea.Cmd {
 	return nil
 }
@@ -81,7 +94,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := make([]tea.Cmd, 0)
 
 	switch m.State.(type) {
-	case StateSerialInput:
+	case StateFileInput, StateSerialInput:
 		var cmd tea.Cmd
 		m.TextInput, cmd = m.TextInput.Update(msg)
 		cmds = append(cmds, cmd)
@@ -101,6 +114,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			cmd = m.HandleKey(msg.String())
 			cmds = append(cmds, cmd)
+		case StateFileInput:
+			switch msg.String() {
+			case "enter":
+				m.LoadFile(m.TextInput.Value())
+				fallthrough
+			case "esc":
+				m.State = StateNormal{}
+			}
 		case StateSerialInput:
 			switch msg.String() {
 			case "enter":
@@ -117,6 +138,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) HandleKey(key string) tea.Cmd {
 	var cmd tea.Cmd
 	switch key {
+	case "l":
+		m.State = StateFileInput{}
+		cmd = m.TextInput.Focus()
+		m.TextInput.Reset()
+		m.TextInput.Placeholder = "Path..."
 	case "s":
 		amount := int64(1)
 		if m.NumBuffer != "" {

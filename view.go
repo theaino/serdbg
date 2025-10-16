@@ -15,7 +15,8 @@ var sentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
 var currentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
 var futureStyle = lipgloss.NewStyle().Italic(true)
 
-func (m *Model) View() string { if m.Width == 0 {
+func (m *Model) View() string {
+	if m.Width == 0 {
 		return ""
 	}
 
@@ -62,6 +63,7 @@ func (m *Model) View() string { if m.Width == 0 {
 	switch m.State.(type) {
 	case StateNormal:
 		footerEntries := []string{
+			"l - Load file",
 			"s - Step",
 			"[0-9]+s - Step n times",
 			"e - Send whole buffer",
@@ -78,7 +80,7 @@ func (m *Model) View() string { if m.Width == 0 {
 			))
 		}
 		footerValue, footerViewHeight = JoinStringWrapped(footerEntries, "    ", m.Width)
-	case StateSerialInput:
+	case StateFileInput, StateSerialInput:
 		footerValue = m.TextInput.View()
 	}
 
@@ -115,7 +117,7 @@ func (m *Model) View() string { if m.Width == 0 {
 func (m *Model) getInstructionSlice(height int) ([]string, int64) {
 	padding := max(float64(height - 1) / 2, 0)
 	startIdx := max(0, m.InstructionPointer.Load() - int64(math.Ceil(padding)))
-	endIdx := startIdx + int64(height)
+	endIdx := min(startIdx + int64(height), int64(len(m.Instructions)))
 
 	stringInstructions := make([]string, endIdx - startIdx)
 	for idx, instruction := range m.Instructions[startIdx:endIdx] {
